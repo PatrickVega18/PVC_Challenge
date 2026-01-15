@@ -36,19 +36,19 @@ Este repositorio contiene las soluciones para los dos desafíos técnicos plante
         - **Transformer:** Mapea datos de DB a filas de Excel.
         - **Presenter:** Formatea datos para la vista (KB, Fechas).
 
-### 🚀 Instrucciones de Ejecución (Importante)
+### Instrucciones de Ejecución
 
 Dado que el sistema utiliza procesamiento en segundo plano, es necesario tener activo un **Worker** para procesar las colas.
 
-**En entorno local (Desarrollo):**
+**En entorno local:**
 Abrir una terminal dedicada y ejecutar:
 ```bash
 php artisan queue:work
 ```
 
-*Este comando se quedará escuchando y procesará los reportes a medida que se soliciten en la web.*
+*El comando se quedará escuchando y procesará los reportes a medida que se soliciten en la web.*
 
-**En entorno Productivo:**
+**En entorno de Producción:**
 No se debe usar `queue:work` manualmente. Se debe utilizar un gestor de procesos como **Supervisor** (Supervisord) para garantizar que el proceso del worker se mantenga siempre activo y se reinicie en caso de fallo.
 
 ---
