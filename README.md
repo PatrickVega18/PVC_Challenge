@@ -15,20 +15,41 @@ Este repositorio contiene las soluciones para los dos desafíos técnicos plante
 
 ### Estrategia Técnica Implementada
 
-1.  **Streaming vs Buffering:**
-    - Se utilizó la librería **OpenSpout** para escribir el archivo Excel línea por línea directamente al flujo de salida (output stream).
-    - **Por qué:** Evita cargar todo el archivo en la memoria RAM (algo común en librerías como PhpSpreadsheet). Esto permite exportar millones de registros con un consumo de memoria constante y bajo.
+1.  **Arquitectura Asíncrona (Queues & Jobs):**
+    - Se implementó un sistema de **Colas (Jobs)** para desacoplar la generación del reporte del ciclo de vida de la petición HTTP.
+    - **Por qué:** Procesar millones de registros toma tiempo. Una descarga sincrónica causaría un **Timeout (Error 504)** en el servidor web. La solución asíncrona garantiza la estabilidad del servidor y mejora la UX mediante un sistema de "Solicitud -> Procesamiento -> Notificación".
 
-2.  **SQL Optimization:**
-    - En lugar de usar Eloquent con relaciones (`with()`), que hidrataría miles de objetos PHP pesados, se utilizó **Query Builder** con `UNION ALL`.
-    - **Por qué:** La base de datos relacional es jerárquica (Reporte -> Deudas), pero el Excel es plano. Trasladar la lógica de "aplanado" a SQL mediante `UNION ALL` es  más rápido que procesarlo en PHP, y evita el problema de consultas.
+2.  **Gestión de Memoria O(1) (Chunking):**
+    - Se reemplazó el uso de cursores por `chunkById(1000)` combinado con `OpenSpout` y limpieza explícita de memoria (`unset`).
+    - **Por qué:** Permite procesar datasets infinitos con un consumo de RAM plano y constante (aprox. 20MB), evitando errores de **Out of Memory (OOM)**. Se deshabilitó el `QueryLog` de Laravel para evitar fugas de memoria silenciosas.
 
-3.  **Database Cursors:**
-    - Se utilizó el método `cursor()` de Laravel.
-    - **Por qué:** Mantiene solo un registro de la base de datos en memoria a la vez mientras se itera, siendo perfecto para la estrategia de streaming del Excel.
+3.  **Optimización SQL (Read Model Repository):**
+    - Se evitó la hidratación de modelos Eloquent y el problema N+1. Se utilizó **Query Builder** con `UNION ALL` encapsulado en un Repositorio.
+    - **Por qué:** Traslada la carga de procesamiento ("aplanar" tablas relacionales) al motor de Base de Datos, que es mucho más eficiente que PHP para estas tareas.
 
-4.  **Arquitectura:**
-    - Se separó la lógica en un **Service Pattern** (`CreditReportService`) para no saturar el controlador y permitir futura reutilización (ej. comandos de consola).
+4.  **Clean Architecture & SOLID:**
+    - Se aplicó una separación estricta de responsabilidades para evitar un "God Controller":
+        - **Controller:** Solo gestiona flujo HTTP.
+        - **Job:** Maneja la asincronía.
+        - **Service:** Orquesta la lógica de negocio.
+        - **Repository:** Abstrae la consulta compleja SQL.
+        - **Transformer:** Mapea datos de DB a filas de Excel.
+        - **Presenter:** Formatea datos para la vista (KB, Fechas).
+
+### 🚀 Instrucciones de Ejecución (Importante)
+
+Dado que el sistema utiliza procesamiento en segundo plano, es necesario tener activo un **Worker** para procesar las colas.
+
+**En entorno local (Desarrollo):**
+Abrir una terminal dedicada y ejecutar:
+```bash
+php artisan queue:work
+```
+
+*Este comando se quedará escuchando y procesará los reportes a medida que se soliciten en la web.*
+
+**En entorno Productivo:**
+No se debe usar `queue:work` manualmente. Se debe utilizar un gestor de procesos como **Supervisor** (Supervisord) para garantizar que el proceso del worker se mantenga siempre activo y se reinicie en caso de fallo.
 
 ---
 
